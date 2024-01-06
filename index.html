@@ -1,83 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Audio Streaming</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaStream Streaming</title>
 </head>
 <body>
-  <button id="startButton">Start Recording</button>
-  <button id="stopButton" disabled>Stop Recording</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script>
+        // Assuming you already have Socket.IO instantiated (io) and connected to the server
 
-  <div id="audioContainer"></div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.1/socket.io.js"></script>
-  <script>
-    const socket = io();
-
-    let mediaRecorder;
-    let audioChunks = [];
-    let audioPlayer;
-
-    const startButton = document.getElementById('startButton');
-    const stopButton = document.getElementById('stopButton');
-    const audioContainer = document.getElementById('audioContainer');
-
-    startButton.addEventListener('click', startRecording);
-    stopButton.addEventListener('click', stopRecording);
-
-    socket.on('audioData', (data) => {
-      audioChunks.push(data);
-
-      if (!audioPlayer) {
-        playAudio();
-      }
-    });
-
-    function playAudio() {
-      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-      const audioURL = URL.createObjectURL(audioBlob);
-
-      audioPlayer = new Audio(audioURL);
-      audioPlayer.controls = true;
-      audioContainer.appendChild(audioPlayer);
-      audioPlayer.play();
-
-      // Clear the audio chunks for the next recording
-      audioChunks = [];
-    }
-
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then((stream) => {
-        mediaRecorder = new MediaRecorder(stream);
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            audioChunks.push(event.data);
-            socket.emit('audioData', event.data);
-          }
-        };
-
-        mediaRecorder.onstop = () => {
-          // Stop recording and play the accumulated audio
-          playAudio();
-        };
-      })
-      .catch((error) => {
-        console.error('Error accessing microphone:', error);
-      });
-
-    function startRecording() {
-      mediaRecorder.start();
-      startButton.disabled = true;
-      stopButton.disabled = false;
-    }
-
-    function stopRecording() {
-      mediaRecorder.stop();
-      startButton.disabled = false;
-      stopButton.disabled = true;
-    }
-  </script>
+        // Get user media stream
+        navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+            .then((mediaStream) => {
+              let recorder = new MediaRecorder(mediaStream);
+              recorder.ondataavailable = e => {
+                console.log("start record")
+                let arrayBuffer = e.data;
+                // Send the ArrayBuffer to the server
+                const socket = io();
+                socket.emit('stream', arrayBuffer);
+                recorder.stop();
+                };
+                recorder.start(10000);
+            })
+            .catch((error) => {
+                console.error('Error accessing media devices:', error);
+            });
+    </script>
 </body>
 </html>
