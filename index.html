@@ -2,30 +2,54 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediaStream Streaming</title>
+    <title>Real-time PCM Data Sender</title>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <script>
-        // Assuming you already have Socket.IO instantiated (io) and connected to the server
+        // Establish a WebSocket connection to the server
+        const socket = new WebSocket('ws://localhost:3000');
 
-        // Get user media stream
-        navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+        // Request microphone access
+        navigator.mediaDevices.getUserMedia({ audio: true })
             .then((mediaStream) => {
-              let recorder = new MediaRecorder(mediaStream);
-              recorder.ondataavailable = e => {
-                console.log("start record")
-                let arrayBuffer = e.data;
-                // Send the ArrayBuffer to the server
-                const socket = io();
-                socket.emit('stream', arrayBuffer);
-                recorder.stop();
+                // Create an audio context and a media stream source
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const sourceNode = audioContext.createMediaStreamSource(mediaStream);
+
+                // Set up a script processor to handle PCM data
+                const scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
+
+                // Connect the audio nodes
+                sourceNode.connect(scriptNode);
+                scriptNode.connect(audioContext.destination);
+
+                // Handle PCM data
+                scriptNode.onaudioprocess = (event) => {
+                    const pcmData = event.inputBuffer.getChannelData(0);
+                    
+                    // Send PCM data to the server through the WebSocket connection
+                    socket.send(new Int16Array(pcmData.buffer));
                 };
-                recorder.start(10000);
+
+                // Print a message when the WebSocket connection is opened
+                socket.addEventListener('open', () => {
+                    console.log('WebSocket connection opened');
+                });
+
+                // Print a message when the WebSocket connection is closed
+                socket.addEventListener('close', () => {
+                    console.log('WebSocket connection closed');
+                });
+
+                // Print an error message if there is a WebSocket error
+                socket.addEventListener('error', (error) => {
+                    console.error('WebSocket error:', error);
+                });
             })
             .catch((error) => {
-                console.error('Error accessing media devices:', error);
+                console.error('Error accessing microphone:', error);
             });
     </script>
 </body>
