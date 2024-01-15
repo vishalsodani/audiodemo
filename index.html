@@ -13,71 +13,126 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.1/socket.io.js"></script>
   <script>
+    let audioContext;
     const socket = io();
-
-    let mediaRecorder;
-    let audioChunks = [];
-    let audioPlayer;
-
+    let localMediaRecorder;
+    let peerMediaRecorder;
+    
+    let localAudioChunks = [];
+    let peerAudioChunks = [];
+    
+    let localMediaStreamSourceNode;
+    let peerMediaStreamSourceNode;
+    
     const startButton = document.getElementById('startButton');
     const stopButton = document.getElementById('stopButton');
-    const audioContainer = document.getElementById('audioContainer');
-
+    
     startButton.addEventListener('click', startRecording);
     stopButton.addEventListener('click', stopRecording);
-
-    socket.on('audioData', (data) => {
-      audioChunks.push(data);
-
-      if (!audioPlayer) {
-        playAudio();
+    
+    socket.on('localAudioData', (data) => {
+      localAudioChunks.push(data);
+      console.log(data);
+      if (!localMediaStreamSourceNode) {
+        startLocalAudioProcessing();
       }
     });
-
-    function playAudio() {
-      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-      const audioURL = URL.createObjectURL(audioBlob);
-
-      audioPlayer = new Audio(audioURL);
-      audioPlayer.controls = true;
-      audioContainer.appendChild(audioPlayer);
-      audioPlayer.play();
-
-      // Clear the audio chunks for the next recording
-      audioChunks = [];
+    
+    socket.on('peerAudioData', (data) => {
+      peerAudioChunks.push(data);
+    
+      if (!peerMediaStreamSourceNode) {
+        startPeerAudioProcessing();
+      }
+    });
+    
+    function startLocalAudioProcessing() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          }
+      localMediaStreamSourceNode = audioContext.createMediaStreamSource(new MediaStream());
+      //localMediaStreamSourceNode.connect(audioContext.destination); // Connect to speakers (optional)
+    
+      // Do additional processing or send audio to API here
+      sendAudioToAPI(localAudioChunks, 'local');
+    
+      // Clear the audioChunks for the next recording
+      localAudioChunks = [];
     }
-
+    
+    function startPeerAudioProcessing() {
+        if (!audioContext || !localMediaRecorder.stream.getAudioTracks().length) {
+            return;
+          }
+      peerMediaStreamSourceNode = audioContext.createMediaStreamSource(new MediaStream());
+      //peerMediaStreamSourceNode.connect(audioContext.destination); // Connect to speakers (optional)
+    
+      // Do additional processing or send audio to API here
+      sendAudioToAPI(peerAudioChunks, 'peer');
+    
+      // Clear the audioChunks for the next recording
+      peerAudioChunks = [];
+    }
+    
+    function sendAudioToAPI(audioChunks, streamType) {
+      // Create a Blob from audioChunks
+      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+    
+      // Create a FormData object and append the audioBlob
+      /* const formData = new FormData();
+      formData.append('audio', audioBlob, `${streamType}_recording.wav`);
+    
+      // Send the audio data to your API using fetch
+      fetch('https://your-api-endpoint.com/upload-audio', {
+        method: 'POST',
+        body: formData,
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log(`API Response for ${streamType} audio:`, data);
+      })
+      .catch(error => {
+        console.error(`Error sending ${streamType} audio to API:`, error);
+      }); */
+    }
+    
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then((stream) => {
-        mediaRecorder = new MediaRecorder(stream);
-
-        mediaRecorder.ondataavailable = (event) => {
+        console.log('Audio tracks in the stream:', stream.getAudioTracks());
+        localMediaRecorder = new MediaRecorder(stream);
+    
+        localMediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
-            audioChunks.push(event.data);
-            socket.emit('audioData', event.data);
+            alert("hi")
+            localAudioChunks.push(event.data);
+            //socket.emit('localAudioData', event.data);
           }
         };
-
-        mediaRecorder.onstop = () => {
-          // Stop recording and play the accumulated audio
-          playAudio();
+    
+        localMediaRecorder.onstop = () => {
+          // Process the accumulated audio and send it to the API
+          startLocalAudioProcessing();
         };
       })
       .catch((error) => {
         console.error('Error accessing microphone:', error);
       });
-
+    
     function startRecording() {
-      mediaRecorder.start();
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          }
+      localMediaRecorder.start();
       startButton.disabled = true;
       stopButton.disabled = false;
     }
-
+    
     function stopRecording() {
-      mediaRecorder.stop();
+      localMediaRecorder.stop();
       startButton.disabled = false;
       stopButton.disabled = true;
     }
+    
   </script>
 </body>
 </html>

@@ -2,17 +2,17 @@
 // npm install express socket.io
 
 const express = require('express');
-const https = require('https');
+const https = require('http');
 const fs = require('fs');
-const options = {
-    key: fs.readFileSync('/home/alien/webrtc/testnodesocket/test-node-socketio/server/newssl/key.pem'),
-cert: fs.readFileSync('/home/alien/webrtc/testnodesocket/test-node-socketio/server/newssl/cert.pem')
-};
+// const options = {
+//     key: fs.readFileSync('/home/alien/webrtc/testnodesocket/test-node-socketio/server/newssl/key.pem'),
+// cert: fs.readFileSync('/home/alien/webrtc/testnodesocket/test-node-socketio/server/newssl/cert.pem')
+// };
 
 const socketIO = require('socket.io');
 
 const app = express();
-const server = https.createServer(options, app);
+const server = https.createServer(app);
 const io = socketIO(server);
 
 // Serve HTML file with audio streaming page
